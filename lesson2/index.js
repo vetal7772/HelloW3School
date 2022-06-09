@@ -4,32 +4,13 @@
 const BASE_API_URL = 'https://api.github.com/';
 const SECURITY_HEADERS = {
     headers: {
-      authorization: "token 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"
+      authorization: "token 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"
     }
   };
 
 const rootElement = document.getElementById('root');
 const loadingElement = document.getElementById('loading-overlay');
 
-const fightersDetailsMap = new Map();
-
- async function startApp() {
-    try {
-        loadingElement.style.visibility = 'visible';
-    
-        const endpoint = 'repos/oleksandr-danylchenko/street-fighter/contents/resources/api/fighters.json';
-        const fighters = await callApi(endpoint);
-            
-        const fightersElement = createFighters(fighters);
-        rootElement.appendChild(fightersElement);
-      } catch (error) {
-        console.warn(error);
-        rootElement.innerText = 'Failed to load data';
-      } finally {
-        loadingElement.style.visibility = 'hidden';
-      }
-    }
-  
 
     function callApi(endpoint, method = 'GET') {
         const url = BASE_API_URL + endpoint;
@@ -41,73 +22,142 @@ const fightersDetailsMap = new Map();
               ? response.json()
               : Promise.reject(Error('Failed to load'))
           )
-          .then(file => JSON.parse(atob(file.content)))
+          //.then(file => JSON.parse(atob(file.content)))
           .catch(error => { throw error });
       }
 
-function getFightersNames(fighters) {
-  return fighters.map(it => it.name).join('\n');
-}
+      class FighterService {
+        #endpoint = 'repos/oleksandr-danylchenko/street-fighter/contents/resources/api/fighters.json'
+       
+        async getFighters() {
+          try {
+            const apiResult = await callApi(this.#endpoint, 'GET');
+            return JSON.parse(atob(apiResult.content));
+          } catch (error) {
+            throw error;
+          }
+        }
+       }
+       const fighterService = new FighterService();
 
-function createElement({ tagName, className = '', attributes = {} }) {
-    const element = document.createElement(tagName);
-    element.classList.add(className);
+       class View {
+        element;
       
-    Object
-      .keys(attributes)
-      .forEach(key => element.setAttribute(key, attributes[key]));
-  
-    return element;
-  }
+        createElement({ tagName, className = '', attributes = {} }) {
+          const element = document.createElement(tagName);
+          element.classList.add(className);
+          
+          Object.keys(attributes).forEach(key => element.setAttribute(key, attributes[key]));
+      
+          return element;
+        }
+     x
 
-  function createName(name) {
-    const nameElement = createElement({ tagName: 'span', className: 'name' });
-    nameElement.innerText = name;
-  
-    return nameElement;
-  }
-  
-  function createImage(source) {
-    const attributes = { src: source };
-    const imgElement = createElement({
-      tagName: 'img',
-      className: 'fighter-image',
-      attributes
-    });
-  
-    return imgElement;
-  }
+      get element() {
+        return this.element;
+      }
+      
 
-  function createFighter(fighter) {
-    const { name, source } = fighter;
-    const nameElement = createName(name);
-    const imageElement = createImage(source);
-    const element = createElement({ tagName: 'div', className: 'fighter' });
-  
-    element.append(imageElement, nameElement);
 
-    element.addEventListener('click', (event) => handleFighterClick(event, fighter), false)
+      set element(value) {
+        this.element = value;
+      }
 
-    function handleFighterClick(event, fighter) {
-      const { _id } = fighter;
-    
-      if(!fightersDetailsMap.has(_id)) {
-        // send request here
-        fightersDetailsMap.set(_id, fighter);
+
+      get element() {
+        return this.element;
+      }
+      get isInitialized() {
+        return !!this.element;
+      }
+      
+      set element(value) {
+        this.element = value;
+      }
+    }
+
+    class FighterView extends View {
+      constructor(fighter, handleClick) {
+        super();
+        this.createFighter(fighter, handleClick);
       }
     
-      console.log(fightersDetailsMap.get(_id));
+      createFighter(fighter, handleClick) {
+        const { name, source } = fighter;
+        const nameElement = this.createName(name);
+        const imageElement = this.createImage(source);
+    
+        this.element = this.createElement({ tagName: 'div', className: 'fighter' });
+        this.element.append(imageElement, nameElement);
+        this.element.addEventListener('click', event => handleClick(event, fighter), false);
+      }
+    
+      createName(name) {
+        const nameElement = this.createElement({ tagName: 'span', className: 'name' });
+        nameElement.innerText = name;
+        return nameElement;
+      }
+    
+      createImage(source) {
+        const attributes = { src: source };
+        return this.createElement({
+          tagName: 'img',
+          className: 'fighter-image',
+          attributes
+        });
+      }
     }
-    return element;
-  }
+    
+    class FightersView extends View {
+      fightersDetailsMap = new Map();
+    
+      constructor(fighters) {
+        super();
+    
+        this.handleClick = this.handleFighterClick.bind(this);
+        this.createFighters(fighters);
+      }
+    
+      createFighters(fighters) {
+        const fighterElements = fighters.map(fighter => {
+    
+          // 1. Class function with context
+          const fighterView = new FighterView(fighter, this.handleClick);
+          return fighterView.element;
+        });
+    
+        this.element = this.createElement({ tagName: 'div', className: 'fighters' });
+        this.element.append(...fighterElements);
+      }
+    
+      handleFighterClick(event, fighter) {
+        this.fightersDetailsMap.set(fighter._id, fighter);
+        console.log('clicked')
+        // get from map or load info and add to fightersMap
+        // show modal with fighter info
+        // allow to edit health and power in this modal
+      }
+    }
 
-  function createFighters(fighters) {
-    const fighterElements = fighters.map(fighter => createFighter(fighter));
-    const element = createElement({ tagName: 'div', className: 'fighters' });
-  
-    element.append(...fighterElements);
-  
-    return element;
-  }
-
-startApp();
+    class App {
+      static rootElement = document.getElementById('root');
+      static loadingElement = document.getElementById('loading-overlay');
+    
+      static async startApp() {
+        try {
+          App.loadingElement.style.visibility = 'visible';
+    
+          const fighters = await fighterService.getFighters();
+          const fightersView = new FightersView(fighters);
+    
+          App.rootElement.appendChild(fightersView.element);
+        } catch (error) {
+          console.warn(error);
+          App.rootElement.innerText = 'Failed to load data';
+        } finally {
+          App.loadingElement.style.visibility = 'hidden';
+        }
+      }
+    }
+    
+    App.startApp();
